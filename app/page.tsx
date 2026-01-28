@@ -1,42 +1,51 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useCallback } from 'react'
 import HomeDashboard from '@/components/home-dashboard'
-import { routes, buildFilteredUrl } from '@/lib/navigation'
+import { useNavigateWithFilters } from '@/hooks/use-navigate-with-filters'
 
 export default function DashboardPage() {
-  const router = useRouter()
+  const { toCompetitors, toAlerts, toMarketIntel, toBoard, toDashboard } = useNavigateWithFilters()
 
-  // Bridge handlers for legacy HomeDashboard props
-  // These translate old tab-based navigation to new URL-based routing
+  // Bridge handlers for HomeDashboard props
+  // These translate tab-based navigation to URL-based routing with filters
   const handleNavigate = useCallback((tab: string) => {
     switch (tab) {
       case 'home':
-        router.push(routes.home)
+        toDashboard()
         break
       case 'board':
-        router.push(routes.board)
+        toBoard()
         break
       case 'competitors':
-        router.push(routes.competitors)
+        toCompetitors()
+        break
+      case 'competitors-ads':
+        // Navigate to competitors with ads view
+        toCompetitors({ view: 'ads' })
         break
       case 'market-intel':
-        router.push(routes.marketIntel)
+        toMarketIntel()
         break
       case 'alerts':
-        router.push(routes.alerts)
+        toAlerts()
         break
       default:
-        router.push(routes.home)
+        toDashboard()
     }
-  }, [router])
+  }, [toDashboard, toBoard, toCompetitors, toMarketIntel, toAlerts])
 
+  // Navigate to market intel with practice area filter
   const handleNavigateToPracticeArea = useCallback((area: string) => {
-    // Navigate to market intel with practice area filter
-    const url = buildFilteredUrl(routes.marketIntel, { practiceArea: area })
-    router.push(url)
-  }, [router])
+    // Normalize practice area names for URL params
+    const practiceAreaMap: Record<string, string> = {
+      'Class Action': 'class-action',
+      'Mass Torts': 'mass-torts',
+      'Mass Arbitration': 'mass-arbitration',
+    }
+    const normalizedArea = practiceAreaMap[area] || area.toLowerCase().replace(/\s+/g, '-')
+    toMarketIntel({ practiceArea: normalizedArea })
+  }, [toMarketIntel])
 
   return (
     <HomeDashboard 

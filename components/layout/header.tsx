@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Search,
   Command,
-  Bell,
   User,
   Settings,
   LogOut,
@@ -16,10 +15,11 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { mainNavItems, isRouteActive } from '@/lib/navigation'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { NotificationsDropdown } from '@/components/notifications-dropdown'
+import { UserPreferencesModal } from '@/components/user-preferences-modal'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +46,10 @@ export function Header({ alertCount = 0 }: HeaderProps) {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchCategory, setSearchCategory] = useState('All')
+  
+  // User preferences modal state
+  const [preferencesOpen, setPreferencesOpen] = useState(false)
+  const [preferencesTab, setPreferencesTab] = useState<'profile' | 'settings' | 'help'>('profile')
 
   const searchCategories = ['All', 'Firms', 'Events', 'Filings', 'News']
 
@@ -64,8 +68,6 @@ export function Header({ alertCount = 0 }: HeaderProps) {
 
   // Navigation handler for command palette
   const handleNavigate = (tab: string) => {
-    // The command palette uses this to navigate
-    // We use the router to navigate to the correct route
     const routeMap: Record<string, string> = {
       'home': '/',
       'board': '/board',
@@ -81,12 +83,24 @@ export function Header({ alertCount = 0 }: HeaderProps) {
     setCommandPaletteOpen(false)
   }
 
+  // Open preferences modal with specific tab
+  const openPreferences = (tab: 'profile' | 'settings' | 'help') => {
+    setPreferencesTab(tab)
+    setPreferencesOpen(true)
+  }
+
   return (
     <>
       <CommandPalette
         open={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
         onNavigate={handleNavigate}
+      />
+
+      <UserPreferencesModal
+        open={preferencesOpen}
+        onOpenChange={setPreferencesOpen}
+        defaultTab={preferencesTab}
       />
 
       <header className="h-14 border-b border-border bg-background sticky top-0 z-50">
@@ -126,43 +140,24 @@ export function Header({ alertCount = 0 }: HeaderProps) {
           </div>
 
           {/* Center: Search */}
-          <div className="hidden lg:flex items-center max-w-md flex-1 mx-6">
-            <div className="relative flex items-center w-full">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="absolute left-1 h-7 px-2 text-xs text-muted-foreground hover:text-foreground z-10"
-                  >
-                    {searchCategory}
-                    <ChevronDown className="h-3 w-3 ml-1" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-32">
-                  {searchCategories.map((category) => (
-                    <DropdownMenuItem
-                      key={category}
-                      onClick={() => setSearchCategory(category)}
-                    >
-                      {category}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Search className="absolute left-20 h-4 w-4 text-muted-foreground pointer-events-none" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="pl-28 pr-20 h-9 bg-secondary/50 border-transparent focus:border-border text-sm"
-              />
-              <div className="absolute right-2 flex items-center gap-1">
+          <div className="flex-1 max-w-md mx-4 hidden lg:block">
+            <div className="relative">
+              <div className="flex items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Search firms, events, filings..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 pr-4 h-9 bg-secondary/50 border-border focus-visible:bg-background"
+                  />
+                </div>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => setCommandPaletteOpen(true)}
-                      className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-secondary text-muted-foreground text-xs hover:text-foreground transition-colors"
+                      className="ml-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-secondary text-muted-foreground text-xs hover:text-foreground transition-colors"
                     >
                       <Command className="h-3 w-3" />
                       <span>K</span>
@@ -178,25 +173,8 @@ export function Header({ alertCount = 0 }: HeaderProps) {
 
           {/* Right: Actions + Profile */}
           <div className="flex items-center gap-2">
-            {/* Notifications */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative h-9 w-9">
-                  <Bell className="h-4 w-4" />
-                  {alertCount > 0 && (
-                    <Badge
-                      variant="destructive"
-                      className="absolute -top-0.5 -right-0.5 h-4 w-4 p-0 flex items-center justify-center text-[10px] font-bold"
-                    >
-                      {alertCount > 9 ? '9+' : alertCount}
-                    </Badge>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Notifications</p>
-              </TooltipContent>
-            </Tooltip>
+            {/* Notifications Dropdown */}
+            <NotificationsDropdown />
 
             <ThemeToggle />
 
@@ -220,15 +198,15 @@ export function Header({ alertCount = 0 }: HeaderProps) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openPreferences('profile')}>
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openPreferences('settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openPreferences('help')}>
                   <HelpCircle className="mr-2 h-4 w-4" />
                   <span>Help & Support</span>
                 </DropdownMenuItem>

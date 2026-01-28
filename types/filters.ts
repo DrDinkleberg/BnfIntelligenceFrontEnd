@@ -37,11 +37,16 @@ export const AlertCategoryEnum = z.enum([
 ])
 export type AlertCategory = z.infer<typeof AlertCategoryEnum>
 
+// Competitor view types
+export const CompetitorViewEnum = z.enum(['firms', 'ads'])
+export type CompetitorView = z.infer<typeof CompetitorViewEnum>
+
 // ============================================
 // Page-Specific Filter Schemas
 // ============================================
 
 export const CompetitorFiltersSchema = z.object({
+  view: CompetitorViewEnum.optional().default('firms'),
   firm: z.string().optional(),
   tier: TierEnum.optional().default('all'),
   practiceArea: PracticeAreaEnum.optional().default('all'),

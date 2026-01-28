@@ -1,38 +1,37 @@
 "use client"
 
-import { TrendingUp, TrendingDown, Users, Clock, Zap, ChevronRight, ExternalLink, Megaphone } from "lucide-react"
-import React from "react"
-
+import {
+  ExternalLink,
+  TrendingUp,
+  TrendingDown,
+  Clock,
+  ChevronRight,
+  Users,
+  Zap,
+  Megaphone,
+} from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
-// Mini sparkline chart component
+// Mini sparkline chart
 function MiniChart({ data, color }: { data: number[]; color: string }) {
   const max = Math.max(...data)
   const min = Math.min(...data)
   const range = max - min || 1
-  const height = 28
-  const width = 64
+
   const points = data
     .map((value, index) => {
-      const x = (index / (data.length - 1)) * width
-      const y = height - ((value - min) / range) * height
+      const x = (index / (data.length - 1)) * 60
+      const y = 20 - ((value - min) / range) * 18
       return `${x},${y}`
     })
     .join(" ")
 
   return (
-    <svg width={width} height={height} className="overflow-visible">
-      <defs>
-        <linearGradient id={`gradient-${color.replace("#", "")}`} x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor={color} stopOpacity="0.15" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
+    <svg width="60" height="24" className="shrink-0">
       <polyline fill="none" stroke={color} strokeWidth="1.5" points={points} strokeLinecap="round" strokeLinejoin="round" />
-      <polygon fill={`url(#gradient-${color.replace("#", "")})`} points={`0,${height} ${points} ${width},${height}`} />
     </svg>
   )
 }
@@ -54,9 +53,9 @@ function StatCard({
   chartColor: string
 }) {
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border/50">
+    <div className="flex items-center justify-between p-3 rounded-lg bg-card border border-border">
       <div>
-        <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">{label}</p>
+        <p className="text-[11px] text-muted-foreground uppercase tracking-wide">{label}</p>
         <div className="flex items-baseline gap-2 mt-0.5">
           <span className="text-xl font-bold text-foreground">{value}</span>
           <span className={`text-[10px] font-medium flex items-center gap-0.5 ${trend === "up" ? "text-emerald-400" : "text-red-400"}`}>
@@ -265,6 +264,12 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
     { firm: "Weitz & Luxenberg", platform: "TV", campaign: "Mesothelioma", spend: "$120K", time: "8h" },
   ]
 
+  const practiceAreas = [
+    { title: "Class Action", firms: 342, cases: "1.2K", spend: "$12.4M", trend: "+23%", color: "bg-blue-500" },
+    { title: "Mass Torts", firms: 289, cases: "2.1K", spend: "$18.9M", trend: "+34%", color: "bg-purple-500" },
+    { title: "Mass Arbitration", firms: 98, cases: "45.2K", spend: "$3.2M", trend: "+156%", color: "bg-amber-500" },
+  ]
+
   return (
     <div className="p-6 space-y-6">
       {/* Stats Row */}
@@ -286,7 +291,12 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
                 <CardTitle className="text-sm font-semibold">Today</CardTitle>
                 <Badge variant="secondary" className="text-[10px] h-5">{todayAlerts.length} new</Badge>
               </div>
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs text-muted-foreground h-7"
+                onClick={() => onNavigate("alerts")}
+              >
                 See all
                 <ExternalLink className="h-3 w-3 ml-1" />
               </Button>
@@ -302,13 +312,14 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
                   time={alert.time}
                   severity={alert.severity}
                   category={alert.category}
+                  onClick={() => onNavigate("alerts")}
                 />
               ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* New Ads */}
+        {/* New Ads - Now navigates to Competitors > Ads Feed */}
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -317,7 +328,12 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
                 <CardTitle className="text-sm font-semibold">New ads</CardTitle>
                 <Badge variant="secondary" className="text-[10px] h-5">{newAds.length} detected</Badge>
               </div>
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs text-muted-foreground h-7"
+                onClick={() => onNavigate("competitors-ads")}
+              >
                 See all
                 <ExternalLink className="h-3 w-3 ml-1" />
               </Button>
@@ -329,7 +345,7 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
                 <div
                   key={index}
                   className="flex items-center gap-3 p-3 hover:bg-secondary/50 transition-colors cursor-pointer group"
-                  onClick={() => onNavigate("competitors")}
+                  onClick={() => onNavigate("competitors-ads")}
                 >
                   <Avatar className="h-8 w-8 border border-border">
                     <AvatarFallback className="text-[10px] bg-secondary text-foreground">
@@ -375,6 +391,7 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
                   mentions={topic.mentions}
                   trend={topic.trend}
                   riskLevel={topic.riskLevel}
+                  onClick={() => onNavigate("market-intel")}
                 />
               ))}
             </div>
@@ -391,7 +408,12 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
               <CardTitle className="text-sm font-semibold">Top spenders</CardTitle>
               <Badge variant="secondary" className="text-[10px] h-5">30d</Badge>
             </div>
-            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-xs text-muted-foreground h-7"
+              onClick={() => onNavigate("competitors")}
+            >
               See all
               <ExternalLink className="h-3 w-3 ml-1" />
             </Button>
@@ -415,17 +437,13 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
         </CardContent>
       </Card>
 
-      {/* Practice Areas Quick Access */}
+      {/* Practice Areas - Quick Access */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {[
-          { title: "Class Action", firms: 342, cases: "1.2K", spend: "$12.4M", trend: "+23%", color: "bg-blue-500" },
-          { title: "Mass Torts", firms: 289, cases: "2.1K", spend: "$18.9M", trend: "+34%", color: "bg-purple-500" },
-          { title: "Mass Arbitration", firms: 98, cases: "45.2K", spend: "$3.2M", trend: "+156%", color: "bg-amber-500" },
-        ].map((area) => (
+        {practiceAreas.map((area) => (
           <Card
             key={area.title}
             className="bg-card border-border hover:border-primary/30 transition-colors cursor-pointer group"
-            onClick={() => onNavigate("market-intel")}
+            onClick={() => onNavigateToPracticeArea(area.title)}
           >
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">
