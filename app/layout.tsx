@@ -3,6 +3,8 @@ import type { Metadata } from "next"
 import { Inter, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
 import Providers from "./providers"
+import { Header } from "@/components/layout/header"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 const inter = Inter({ 
   subsets: ["latin"],
@@ -17,7 +19,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "B&F Intelligence - Legal Competitive Intelligence",
   description: "Monitor competitor advertising, regulatory events, social media discussions, and court filings",
-    generator: 'v0.app'
+  generator: 'v0.app'
 }
 
 export default function RootLayout({
@@ -28,7 +30,16 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
-        <Providers>{children}</Providers>
+        <Providers>
+          <TooltipProvider>
+            <div className="min-h-screen bg-background">
+              <Header alertCount={5} />
+              <main className="min-h-[calc(100vh-3.5rem)]">
+                {children}
+              </main>
+            </div>
+          </TooltipProvider>
+        </Providers>
       </body>
     </html>
   )

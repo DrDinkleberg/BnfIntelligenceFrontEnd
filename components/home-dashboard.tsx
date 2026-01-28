@@ -1,6 +1,6 @@
 "use client"
 
-import { TrendingUp, TrendingDown, Users, FileText, DollarSign, AlertTriangle, Clock, Zap, ChevronRight, ExternalLink, Eye } from "lucide-react"
+import { TrendingUp, TrendingDown, Users, Clock, Zap, ChevronRight, ExternalLink, Megaphone } from "lucide-react"
 import React from "react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -258,6 +258,13 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
     { topic: "AI employment discrimination", mentions: 423, trend: 234, riskLevel: "medium" as const },
   ]
 
+  const newAds = [
+    { firm: "Morgan & Morgan", platform: "Google", campaign: "Camp Lejeune", spend: "$89K", time: "2h" },
+    { firm: "Keller Postman", platform: "Meta", campaign: "PFAS Water", spend: "$45K", time: "4h" },
+    { firm: "Napoli Shkolnik", platform: "Google", campaign: "Talc Powder", spend: "$32K", time: "6h" },
+    { firm: "Weitz & Luxenberg", platform: "TV", campaign: "Mesothelioma", spend: "$120K", time: "8h" },
+  ]
+
   return (
     <div className="p-6 space-y-6">
       {/* Stats Row */}
@@ -268,10 +275,10 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
         <StatCard label="Monthly spend" value="$36M" change="+$4.2M" trend="up" chartData={generateChartData()} chartColor="#F59E0B" />
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* What Changed Today - Takes 2 columns */}
-        <Card className="lg:col-span-2 bg-card border-border">
+      {/* Main Content Grid - 3 columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Today's Alerts */}
+        <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -287,7 +294,7 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
           </CardHeader>
           <CardContent className="pt-0">
             <div className="divide-y divide-border/50">
-              {todayAlerts.map((alert, index) => (
+              {todayAlerts.slice(0, 4).map((alert, index) => (
                 <AlertItem
                   key={index}
                   title={alert.title}
@@ -301,7 +308,54 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
           </CardContent>
         </Card>
 
-        {/* Trending Topics - Takes 1 column */}
+        {/* New Ads */}
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Megaphone className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm font-semibold">New ads</CardTitle>
+                <Badge variant="secondary" className="text-[10px] h-5">{newAds.length} detected</Badge>
+              </div>
+              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-7">
+                See all
+                <ExternalLink className="h-3 w-3 ml-1" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="divide-y divide-border/50">
+              {newAds.map((ad, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-3 p-3 hover:bg-secondary/50 transition-colors cursor-pointer group"
+                  onClick={() => onNavigate("competitors")}
+                >
+                  <Avatar className="h-8 w-8 border border-border">
+                    <AvatarFallback className="text-[10px] bg-secondary text-foreground">
+                      {ad.firm.split(" ").map((w) => w[0]).join("").slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-medium text-foreground truncate">{ad.firm}</h4>
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 border-border shrink-0">
+                        {ad.platform}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{ad.campaign}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-semibold text-foreground">{ad.spend}</p>
+                    <p className="text-[10px] text-muted-foreground">{ad.time}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Trending Topics */}
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
@@ -324,10 +378,6 @@ export default function HomeDashboard({ onNavigate, onNavigateToPracticeArea }: 
                 />
               ))}
             </div>
-            <Button variant="ghost" className="w-full mt-3 text-xs text-muted-foreground h-8">
-              See all
-              <ChevronRight className="h-3 w-3 ml-1" />
-            </Button>
           </CardContent>
         </Card>
       </div>
