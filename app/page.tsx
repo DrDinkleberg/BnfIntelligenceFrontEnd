@@ -40,12 +40,14 @@ import CompetitorsView from "@/components/competitors-view"
 import MarketIntel from "@/components/market-intel"
 import CommandPalette from "@/components/command-palette"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { useAuth } from "@/hooks/use-auth"
 
 export default function IntelligenceDashboard() {
   const [searchCategory, setSearchCategory] = useState("All")
   const [activeTab, setActiveTab] = useState("home")
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [alertCount] = useState(5)
+  const { user, logout } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
 
   // Keyboard shortcut for command palette
@@ -312,9 +314,9 @@ export default function IntelligenceDashboard() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
                     <Avatar className="h-8 w-8 border border-border">
-                      <AvatarImage src="/placeholder-user.png" alt="User" />
+                      <AvatarImage src={user?.image || ""} alt={user?.name || "User"} />
                       <AvatarFallback className="bg-primary/20 text-primary text-xs font-medium">
-                        JD
+                        {user?.name?.split(" ").map(n => n[0]).join("") || "?"}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -322,8 +324,8 @@ export default function IntelligenceDashboard() {
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">John Doe</p>
-                      <p className="text-xs leading-none text-muted-foreground">john.doe@lawfirm.com</p>
+                      <p className="text-sm font-medium leading-none">{user?.name}</p>
+                      <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
@@ -340,7 +342,7 @@ export default function IntelligenceDashboard() {
                     <span>Help & Support</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive focus:text-destructive">
+                  <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => logout()}>
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
                   </DropdownMenuItem>
