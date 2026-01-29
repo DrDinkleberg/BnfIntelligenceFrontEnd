@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import {
   Search,
   Plus,
@@ -17,6 +17,9 @@ import {
   ArrowLeft,
   MoreHorizontal,
   Eye,
+  Download,
+  LayoutGrid,
+  Building2,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -31,7 +34,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
+import { useToast } from "@/hooks/use-toast"
+import { useBoardStore, createCompetitorBoardItem } from "@/lib/stores/board-store"
 
 interface Competitor {
   id: string
@@ -56,7 +69,7 @@ interface Competitor {
   reputationScore: number
 }
 
-const mockCompetitors: Competitor[] = [
+const initialCompetitors: Competitor[] = [
   {
     id: "1",
     name: "Morgan & Morgan",
@@ -200,15 +213,27 @@ const mockActivityFeed = [
 ]
 
 export default function CompetitorsView() {
+  const [competitors, setCompetitors] = useState<Competitor[]>(initialCompetitors)
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [sortBy, setSortBy] = useState("Most Active")
   const [filterPractice, setFilterPractice] = useState("All")
   const [selectedCompetitor, setSelectedCompetitor] = useState<Competitor | null>(null)
+  
+  // Add to Board modal state
+  const [addToBoardOpen, setAddToBoardOpen] = useState(false)
+  const [selectedBoardId, setSelectedBoardId] = useState<string>("")
+  const [selectedColumnId, setSelectedColumnId] = useState<string>("")
+  const [competitorToAdd, setCompetitorToAdd] = useState<Competitor | null>(null)
+  
+  const { toast } = useToast()
+  
+  // Board store
+  const { boards, addItemToBoard, getColumnsByBoardId } = useBoardStore()
 
   const practiceFilters = ["All", "Tracked", "Class Action", "Mass Torts", "Mass Arbitration"]
 
-  const filteredCompetitors = mockCompetitors.filter((c) => {
+  const filteredCompetitors = competitors.filter((c) => {
     const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesPractice = filterPractice === "All" ||
       (filterPractice === "Tracked" && c.isTracked) ||
@@ -228,6 +253,105 @@ export default function CompetitorsView() {
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat("en-US", { notation: "compact" }).format(num)
   }
+
+  // Toggle tracked status for a competitor
+  const handleToggleTracked = useCallback((competitorId: string) => {
+    setCompetitors(prev => 
+      prev.map(c => 
+        c.id === competitorId 
+          ? { ...c, isTracked: !c.isTracked }
+          : c
+      )
+    )
+    
+    // Update selectedCompetitor if it's the one being toggled
+    setSelectedCompetitor(prev => {
+      if (prev && prev.id === competitorId) {
+        const newTrackedState = !prev.isTracked
+        toast({
+          title: newTrackedState ? "Competitor Tracked" : "Competitor Untracked",
+          description: newTrackedState 
+            ? `${prev.name} has been added to your tracked competitors.`
+            : `${prev.name} has been removed from tracked competitors.`,
+        })
+        return { ...prev, isTracked: newTrackedState }
+      }
+      return prev
+    })
+  }, [toast])
+
+  // Open Add to Board modal
+  const handleOpenAddToBoard = useCallback((competitor: Competitor) => {
+    setCompetitorToAdd(competitor)
+    setSelectedBoardId("")
+    setSelectedColumnId("")
+    setAddToBoardOpen(true)
+  }, [])
+
+  // Get columns for selected board
+  const selectedBoardColumns = selectedBoardId ? getColumnsByBoardId(selectedBoardId) : []
+  const selectedBoard = boards.find(b => b.id === selectedBoardId)
+
+  // Confirm adding to board - NOW ACTUALLY ADDS TO BOARD STORE
+  const handleConfirmAddToBoard = useCallback(() => {
+    if (!selectedBoardId || !selectedColumnId || !competitorToAdd) return
+
+    // Create the board item from competitor data
+    const boardItem = createCompetitorBoardItem({
+      id: competitorToAdd.id,
+      name: competitorToAdd.name,
+      location: competitorToAdd.location,
+      website: competitorToAdd.website,
+      practiceAreas: competitorToAdd.practiceAreas,
+      isTracked: competitorToAdd.isTracked,
+      totalAdSpend: competitorToAdd.totalAdSpend,
+      activeCampaigns: competitorToAdd.activeCampaigns,
+    })
+
+    // Add to the board store
+    addItemToBoard(selectedBoardId, selectedColumnId, boardItem)
+
+    const columnName = selectedBoardColumns.find(c => c.id === selectedColumnId)?.title || selectedColumnId
+    const boardName = selectedBoard?.name || "Board"
+
+    toast({
+      title: "Added to Board",
+      description: `${competitorToAdd.name} has been added to "${boardName}" in the "${columnName}" column.`,
+    })
+    
+    setAddToBoardOpen(false)
+    setCompetitorToAdd(null)
+    setSelectedBoardId("")
+    setSelectedColumnId("")
+  }, [selectedBoardId, selectedColumnId, competitorToAdd, selectedBoardColumns, selectedBoard, addItemToBoard, toast])
+
+  // View website
+  const handleViewWebsite = useCallback((website: string) => {
+    window.open(`https://${website}`, "_blank", "noopener,noreferrer")
+  }, [])
+
+  // Export profile as JSON
+  const handleExportProfile = useCallback((competitor: Competitor) => {
+    const exportData = {
+      ...competitor,
+      exportedAt: new Date().toISOString(),
+    }
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${competitor.name.replace(/\s+/g, "-").toLowerCase()}-profile.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    toast({
+      title: "Profile Exported",
+      description: `${competitor.name}'s profile has been downloaded as JSON.`,
+    })
+  }, [toast])
 
   // Competitor Profile View
   if (selectedCompetitor) {
@@ -282,9 +406,18 @@ export default function CompetitorsView() {
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Tracked</span>
-                  <Switch checked={selectedCompetitor.isTracked} />
+                  <Switch 
+                    checked={selectedCompetitor.isTracked}
+                    onCheckedChange={() => handleToggleTracked(selectedCompetitor.id)}
+                  />
                 </div>
-                <Button variant="outline" size="sm" className="bg-transparent">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="bg-transparent gap-2"
+                  onClick={() => handleOpenAddToBoard(selectedCompetitor)}
+                >
+                  <LayoutGrid className="h-4 w-4" />
                   Add to Board
                 </Button>
                 <DropdownMenu>
@@ -294,8 +427,20 @@ export default function CompetitorsView() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>View Website</DropdownMenuItem>
-                    <DropdownMenuItem>Export Profile</DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleViewWebsite(selectedCompetitor.website)}
+                      className="gap-2"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      View Website
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleExportProfile(selectedCompetitor)}
+                      className="gap-2"
+                    >
+                      <Download className="h-4 w-4" />
+                      Export Profile
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -367,7 +512,17 @@ export default function CompetitorsView() {
                               <span className="text-xs text-muted-foreground">{item.date}</span>
                             </div>
                           </div>
-                          <Button variant="ghost" size="sm" className="text-xs">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-xs"
+                            onClick={() => {
+                              toast({
+                                title: "Added to Board",
+                                description: "Activity item has been added to your default board.",
+                              })
+                            }}
+                          >
                             Add to Board
                           </Button>
                         </div>
@@ -425,6 +580,81 @@ export default function CompetitorsView() {
             </TabsContent>
           </Tabs>
         </div>
+
+        {/* Add to Board Modal */}
+        <Dialog open={addToBoardOpen} onOpenChange={setAddToBoardOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <LayoutGrid className="h-5 w-5 text-primary" />
+                Add to Board
+              </DialogTitle>
+              <DialogDescription>
+                Add {competitorToAdd?.name} to a board for tracking and collaboration.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              {/* Board Selection */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Board</label>
+                <div className="grid gap-2 max-h-48 overflow-y-auto">
+                  {boards.map((board) => (
+                    <button
+                      key={board.id}
+                      onClick={() => {
+                        setSelectedBoardId(board.id)
+                        setSelectedColumnId("")
+                      }}
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors text-left ${
+                        selectedBoardId === board.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <Target className="h-4 w-4 text-primary shrink-0" />
+                      <span className="font-medium text-sm">{board.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Column Selection */}
+              {selectedBoardId && selectedBoardColumns.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Select Column</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedBoardColumns.map((column) => (
+                      <button
+                        key={column.id}
+                        onClick={() => setSelectedColumnId(column.id)}
+                        className={`p-2 rounded-md border text-sm transition-colors ${
+                          selectedColumnId === column.id
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        {column.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddToBoardOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleConfirmAddToBoard}
+                disabled={!selectedBoardId || !selectedColumnId}
+              >
+                Add to Board
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     )
   }
@@ -643,9 +873,48 @@ export default function CompetitorsView() {
                     </span>
                   </td>
                   <td className="p-3 text-right">
-                    <Button variant="ghost" size="icon" className="h-7 w-7">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleToggleTracked(competitor.id)
+                          }}
+                        >
+                          {competitor.isTracked ? "Untrack" : "Track"} Firm
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenAddToBoard(competitor)
+                          }}
+                        >
+                          Add to Board
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleViewWebsite(competitor.website)
+                          }}
+                        >
+                          View Website
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleExportProfile(competitor)
+                          }}
+                        >
+                          Export Profile
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </td>
                 </tr>
               ))}
@@ -653,6 +922,81 @@ export default function CompetitorsView() {
           </table>
         </div>
       )}
+
+      {/* Add to Board Modal */}
+      <Dialog open={addToBoardOpen} onOpenChange={setAddToBoardOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LayoutGrid className="h-5 w-5 text-primary" />
+              Add to Board
+            </DialogTitle>
+            <DialogDescription>
+              Add {competitorToAdd?.name} to a board for tracking and collaboration.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Board Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Board</label>
+              <div className="grid gap-2 max-h-48 overflow-y-auto">
+                {boards.map((board) => (
+                  <button
+                    key={board.id}
+                    onClick={() => {
+                      setSelectedBoardId(board.id)
+                      setSelectedColumnId("")
+                    }}
+                    className={`flex items-center gap-3 p-3 rounded-lg border transition-colors text-left ${
+                      selectedBoardId === board.id
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    <Target className="h-4 w-4 text-primary shrink-0" />
+                    <span className="font-medium text-sm">{board.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Column Selection */}
+            {selectedBoardId && selectedBoardColumns.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Column</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {selectedBoardColumns.map((column) => (
+                    <button
+                      key={column.id}
+                      onClick={() => setSelectedColumnId(column.id)}
+                      className={`p-2 rounded-md border text-sm transition-colors ${
+                        selectedColumnId === column.id
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      {column.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddToBoardOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleConfirmAddToBoard}
+              disabled={!selectedBoardId || !selectedColumnId}
+            >
+              Add to Board
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
