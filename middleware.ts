@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getToken } from 'next-auth/jwt'
+
+// Routes that don't require authentication
+const publicRoutes = ['/login', '/api/auth', '/api/health']
 
 function getCSPHeader(): string {
   const csp = {
@@ -42,7 +46,37 @@ function getSecurityHeaders(): Record<string, string> {
   }
 }
 
-export function middleware(request: NextRequest) {
+function isPublicRoute(pathname: string): boolean {
+  return publicRoutes.some(route => pathname.startsWith(route))
+}
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+  
+  // Skip auth check for static files
+  if (
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/static/') ||
+    pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|woff|woff2)$/)
+  ) {
+    return NextResponse.next()
+  }
+  
+  // Check authentication for protected routes
+  if (!isPublicRoute(pathname)) {
+    const token = await getToken({ 
+      req: request, 
+      secret: process.env.NEXTAUTH_SECRET 
+    })
+    
+    if (!token) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('callbackUrl', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+  }
+  
+  // Apply security headers
   const response = NextResponse.next()
   
   const securityHeaders = getSecurityHeaders()
@@ -57,5 +91,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|public/).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }
