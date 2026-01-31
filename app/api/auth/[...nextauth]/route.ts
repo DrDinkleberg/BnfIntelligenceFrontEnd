@@ -1,7 +1,9 @@
-import NextAuth, { type NextAuthOptions } from "next-auth"
+import NextAuth from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
+import type { NextAuthOptions } from "next-auth"
+import type { JWT } from "next-auth/jwt"
 
-export const authOptions: NextAuthOptions = {
+const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -11,56 +13,42 @@ export const authOptions: NextAuthOptions = {
           prompt: "consent",
           access_type: "offline",
           response_type: "code",
-          // Restrict to bursor.com domain
           hd: "bursor.com",
         },
       },
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
-      // Only allow @bursor.com emails
+    async signIn({ user }) {
       if (user.email?.endsWith("@bursor.com")) {
         return true
       }
-      // Reject non-bursor.com emails
       return false
     },
-    async jwt({ token, user, account }) {
-      // Initial sign in
+    jwt({ token, user, account }): JWT {
       if (account && user) {
-        return {
-          ...token,
-          accessToken: account.access_token,
-          refreshToken: account.refresh_token,
-          accessTokenExpires: account.expires_at ? account.expires_at * 1000 : 0,
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            image: user.image,
-          },
+        token.accessToken = account.access_token
+        token.refreshToken = account.refresh_token
+        token.accessTokenExpires = account.expires_at ? account.expires_at * 1000 : 0
+        token.user = {
+          id: user.id,
+          email: user.email ?? "",
+          name: user.name ?? "",
+          image: user.image ?? "",
         }
       }
-
-      // Return previous token if the access token has not expired yet
-      if (Date.now() < (token.accessTokenExpires as number)) {
-        return token
-      }
-
-      // Access token has expired, try to refresh it
-      // For now, we'll just return the token and let the user re-authenticate
       return token
     },
     async session({ session, token }) {
-      if (token) {
+      if (token?.user) {
         session.user = token.user as typeof session.user
+      }
+      if (token?.accessToken) {
         session.accessToken = token.accessToken as string
       }
       return session
     },
     async redirect({ url, baseUrl }) {
-      // After sign in, redirect to dashboard
       if (url.startsWith(baseUrl)) {
         return url
       }
@@ -73,7 +61,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 8 * 60 * 60, // 8 hours
+    maxAge: 8 * 60 * 60,
   },
   secret: process.env.NEXTAUTH_SECRET,
 }

@@ -2,7 +2,6 @@
 
 import { Firestore } from "@google-cloud/firestore"
 import { Storage } from "@google-cloud/storage"
-import type { FirebaseFirestore } from "@google-cloud/firestore"
 
 // Initialize Firestore (GCP's NoSQL database)
 let firestoreInstance: Firestore | null = null

@@ -59,7 +59,7 @@ export function useFilters<T extends z.ZodSchema>(
   const hasActiveFilters = useMemo(() => {
     return Object.keys(rawParams).some(key => {
       const value = rawParams[key]
-      const defaultValue = defaultFilters[key]
+      const defaultValue = (defaultFilters as Record<string, unknown>)[key]
       return value !== undefined && value !== '' && value !== String(defaultValue)
     })
   }, [rawParams, defaultFilters])

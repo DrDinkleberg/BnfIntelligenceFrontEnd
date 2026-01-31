@@ -6,6 +6,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
 import { useState, type ReactNode } from "react"
 import { AuthProvider } from "@/components/auth-provider"
 import { BoardProvider } from "@/lib/stores/board-store"
+import { ConfirmProvider } from '@/components/confirm-dialog'
 
 interface ProvidersProps {
   children: ReactNode
@@ -34,7 +35,9 @@ export default function Providers({ children }: ProvidersProps) {
           disableTransitionOnChange
         >
           <BoardProvider>
-            {children}
+            <ConfirmProvider>
+              {children}
+            </ConfirmProvider>
           </BoardProvider>
         </ThemeProvider>
         <ReactQueryDevtools initialIsOpen={false} />

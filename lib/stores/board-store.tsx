@@ -16,8 +16,14 @@ export interface BoardItem {
   timestamp: string
   assignee?: string
   comments: number
-  // Additional metadata for competitors
+  // Additional metadata
   metadata?: {
+    // Market intel metadata
+    entities?: string[]
+    sentiment?: "positive" | "neutral" | "negative"
+    engagement?: { likes: number; comments: number; shares: number }
+    date?: string
+    // Competitor metadata
     competitorId?: string
     website?: string
     location?: string

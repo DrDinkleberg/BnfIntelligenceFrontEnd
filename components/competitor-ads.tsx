@@ -697,11 +697,11 @@ export default function CompetitorAds({ preSelectedPracticeArea }: CompetitorAds
                   <div className="space-y-4">
                     <div className="grid grid-cols-3 gap-3">
                       <div className="bg-secondary/50 rounded-lg p-3 text-center">
-                        <div className="text-lg font-bold text-blue-400">#{formatNumber(selectedFirm.website_traffic.global_rank)}</div>
+                        <div className="text-lg font-bold text-blue-400">#{formatNumber(selectedFirm.website_traffic.global_rank ?? 0)}</div>
                         <div className="text-[10px] text-muted-foreground">Global Rank</div>
                       </div>
                       <div className="bg-secondary/50 rounded-lg p-3 text-center">
-                        <div className="text-lg font-bold text-emerald-400">{formatNumber(selectedFirm.website_traffic.total_visits)}</div>
+                        <div className="text-lg font-bold text-emerald-400">{formatNumber(selectedFirm.website_traffic.total_visits ?? 0)}</div>
                         <div className="text-[10px] text-muted-foreground">Monthly Visits</div>
                       </div>
                       <div className="bg-secondary/50 rounded-lg p-3 text-center">
@@ -735,12 +735,12 @@ export default function CompetitorAds({ preSelectedPracticeArea }: CompetitorAds
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          {selectedFirm.website_traffic.top_keywords.map((kw) => (
+                          {(selectedFirm.website_traffic.top_keywords ?? []).map((kw) => (
                             <div key={kw.keyword} className="flex items-center justify-between text-xs">
                               <span className="text-foreground">{kw.keyword}</span>
                               <div className="flex items-center gap-3 text-muted-foreground">
-                                <span>{formatNumber(kw.volume)} vol</span>
-                                <span className="font-medium text-foreground">${kw.cpc.toFixed(2)}</span>
+                                <span>{formatNumber(kw.volume ?? 0)} vol</span>
+                                <span className="font-medium text-foreground">${(kw.cpc ?? 0).toFixed(2)}</span>
                               </div>
                             </div>
                           ))}

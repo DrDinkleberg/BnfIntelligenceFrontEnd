@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import {
   Search,
   AlertTriangle,
@@ -15,6 +15,8 @@ import {
   Bookmark,
   X,
   Plus,
+  LayoutGrid,
+  Check,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -26,7 +28,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import SlideOver from "@/components/slide-over"
+import { useToast } from "@/hooks/use-toast"
+import { useBoardStore } from "@/lib/stores/board-store"
 
 interface IntelItem {
   id: string
@@ -40,6 +52,14 @@ interface IntelItem {
   entities: string[]
   timestamp: string
   date: string
+}
+
+// Tracked entities store (in production, this would be a proper store or API)
+interface TrackedEntity {
+  id: string
+  name: string
+  type: string
+  addedAt: string
 }
 
 const mockIntelItems: IntelItem[] = [
@@ -90,69 +110,62 @@ const mockIntelItems: IntelItem[] = [
   {
     id: "5",
     title: "Morgan & Morgan expands PFAS campaign",
-    description: "Detected $2.3M spend increase across Google and Meta platforms. Campaign now targeting 12 new markets with focus on municipal water contamination claims.",
+    description: "Detected $2.3M spend increase across Google and Meta platforms. New creative emphasizes water contamination and health impacts. Targeting expanded to 15 additional DMAs.",
     type: "ad",
-    source: "Google Ads",
-    entities: ["Morgan & Morgan", "PFAS", "Mass Torts"],
-    timestamp: "1d",
-    date: "Jan 26, 2026",
+    source: "Ad Intel",
+    severity: "high",
+    entities: ["Morgan & Morgan", "PFAS", "Water Contamination"],
+    timestamp: "12h",
+    date: "Jan 27, 2026",
   },
   {
     id: "6",
-    title: "DOJ settles with PharmaCorp for $2.3B",
-    description: "Settlement resolves allegations of off-label marketing and kickbacks to physicians. Company admits no wrongdoing. Whistleblower to receive $180M award.",
-    type: "regulatory",
-    source: "DOJ",
-    severity: "medium",
-    entities: ["PharmaCorp", "DOJ", "Whistleblower"],
+    title: "Reuters: Mass tort advertising hits record levels",
+    description: "Annual report shows legal advertising spend up 34% YoY. PFAS, Camp Lejeune, and Ozempic lead categories. Digital channels now represent 67% of total spend.",
+    type: "news",
+    source: "Reuters",
+    sentiment: "neutral",
+    entities: ["Legal Advertising", "Mass Torts", "Industry Trends"],
     timestamp: "1d",
     date: "Jan 26, 2026",
   },
   {
     id: "7",
-    title: "Law360: 2026 mass tort outlook",
-    description: "Annual trends report highlights 40% YoY growth in PFAS filings, declining talc docket, and emerging litigation around AI employment discrimination.",
-    type: "news",
-    source: "Law360",
-    sentiment: "neutral",
-    entities: ["Mass Torts", "PFAS", "AI Litigation"],
-    timestamp: "2d",
-    date: "Jan 25, 2026",
+    title: "NHTSA recall: Airbag defect affects 2.3M vehicles",
+    description: "Takata-manufactured airbags in 2019-2022 models may fail to deploy properly. Manufacturers include Honda, Toyota, and Ford. Remedy parts expected Q2 2026.",
+    type: "regulatory",
+    source: "NHTSA",
+    severity: "critical",
+    entities: ["Takata", "Airbags", "Vehicle Safety"],
+    timestamp: "1d",
+    date: "Jan 26, 2026",
   },
   {
     id: "8",
-    title: "Camp Lejeune explainer goes viral",
-    description: "TikTok attorney @lawbylisa video explaining eligibility criteria reaches 2M views. Comments show high intent with users asking about filing deadlines.",
+    title: "TikTok trend: Ozempic face concerns",
+    description: "Viral content with 45M views discussing facial aging side effects. Medical professionals responding with clarifications. Potential for coordinated legal interest.",
     type: "social",
     source: "TikTok",
-    sentiment: "positive",
-    engagement: { likes: 234000, comments: 8900, shares: 45000 },
-    entities: ["Camp Lejeune", "Legal Marketing", "TikTok"],
+    sentiment: "negative",
+    engagement: { likes: 45000, comments: 8900, shares: 12000 },
+    entities: ["Ozempic", "Side Effects", "Pharmaceutical"],
     timestamp: "2d",
     date: "Jan 25, 2026",
   },
 ]
 
-const mockTrending = [
-  { name: "PFAS water contamination", mentions: 1234, trend: "up" },
-  { name: "Camp Lejeune settlement", mentions: 892, trend: "up" },
-  { name: "Hair relaxer MDL", mentions: 567, trend: "up" },
-  { name: "Talcum powder", mentions: 456, trend: "down" },
-  { name: "Paraquat herbicide", mentions: 345, trend: "stable" },
-]
-
 const mockSavedSearches = [
-  { name: "PFAS class actions", active: true },
-  { name: "FDA warnings", active: false },
-  { name: "Camp Lejeune social", active: true },
+  { name: "PFAS Water", active: true },
+  { name: "Pharmaceutical Recalls", active: false },
+  { name: "Class Action Filings", active: true },
 ]
 
 const typeConfig = {
-  regulatory: { color: "border-l-red-500", icon: AlertTriangle, label: "Regulatory", bgColor: "bg-red-500/10" },
-  filing: { color: "border-l-blue-500", icon: FileText, label: "Filing", bgColor: "bg-blue-500/10" },
-  news: { color: "border-l-orange-500", icon: Newspaper, label: "News", bgColor: "bg-orange-500/10" },
-  social: { color: "border-l-green-500", icon: Radio, label: "Social", bgColor: "bg-green-500/10" },
-  ad: { color: "border-l-primary", icon: Target, label: "Ad Intel", bgColor: "bg-primary/10" },
+  regulatory: { icon: AlertTriangle, label: "Regulatory", color: "border-l-red-500", bgColor: "bg-red-500/10 text-red-500" },
+  news: { icon: Newspaper, label: "News", color: "border-l-zinc-500", bgColor: "bg-zinc-500/10 text-zinc-400" },
+  social: { icon: Radio, label: "Social", color: "border-l-green-500", bgColor: "bg-green-500/10 text-green-500" },
+  filing: { icon: FileText, label: "Filing", color: "border-l-blue-500", bgColor: "bg-blue-500/10 text-blue-500" },
+  ad: { icon: Target, label: "Ad Intel", color: "border-l-primary", bgColor: "bg-primary/10 text-primary" },
 }
 
 const severityConfig = {
@@ -174,6 +187,19 @@ export default function MarketIntel() {
   const [activeSource, setActiveSource] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedItem, setSelectedItem] = useState<IntelItem | null>(null)
+  
+  // Add to Board modal state
+  const [addToBoardOpen, setAddToBoardOpen] = useState(false)
+  const [selectedBoardId, setSelectedBoardId] = useState<string>("")
+  const [selectedColumnId, setSelectedColumnId] = useState<string>("")
+  const [itemToAdd, setItemToAdd] = useState<IntelItem | null>(null)
+  
+  // Tracked entities state
+  const [trackedEntities, setTrackedEntities] = useState<TrackedEntity[]>([])
+  
+  const { toast } = useToast()
+  const { boards, addItemToBoard, getColumnsByBoardId } = useBoardStore()
+  
   const itemsPerPage = 10
   const totalItems = mockIntelItems.length
 
@@ -204,6 +230,117 @@ export default function MarketIntel() {
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat("en-US", { notation: "compact" }).format(num)
   }
+
+  // Get columns for selected board
+  const selectedBoardColumns = selectedBoardId ? getColumnsByBoardId(selectedBoardId) : []
+  const selectedBoard = boards.find(b => b.id === selectedBoardId)
+
+  // Handle opening Add to Board modal
+  const handleOpenAddToBoard = useCallback((item: IntelItem) => {
+    setItemToAdd(item)
+    setSelectedBoardId("")
+    setSelectedColumnId("")
+    setAddToBoardOpen(true)
+  }, [])
+
+  // Confirm adding to board
+  const handleConfirmAddToBoard = useCallback(() => {
+    if (!selectedBoardId || !selectedColumnId || !itemToAdd) return
+
+    // Create the board item from intel data
+    const boardItem = {
+      id: `intel-${itemToAdd.id}-${Date.now()}`,
+      title: itemToAdd.title,
+      description: itemToAdd.description,
+      type: itemToAdd.type as any,
+      source: itemToAdd.source,
+      severity: itemToAdd.severity,
+      timestamp: itemToAdd.timestamp,
+      comments: 0,
+      assignee: undefined,
+      metadata: {
+        entities: itemToAdd.entities,
+        sentiment: itemToAdd.sentiment,
+        engagement: itemToAdd.engagement,
+        date: itemToAdd.date,
+      }
+    }
+
+    // Add to the board store
+    addItemToBoard(selectedBoardId, selectedColumnId, boardItem)
+
+    const columnName = selectedBoardColumns.find(c => c.id === selectedColumnId)?.title || selectedColumnId
+    const boardName = selectedBoard?.name || "Board"
+
+    toast({
+      title: "Added to Board",
+      description: `"${itemToAdd.title}" has been added to "${boardName}" in the "${columnName}" column.`,
+    })
+    
+    setAddToBoardOpen(false)
+    setItemToAdd(null)
+    setSelectedBoardId("")
+    setSelectedColumnId("")
+  }, [selectedBoardId, selectedColumnId, itemToAdd, selectedBoardColumns, selectedBoard, addItemToBoard, toast])
+
+  // Handle tracking an entity
+  const handleTrackEntity = useCallback((entityName: string) => {
+    const isAlreadyTracked = trackedEntities.some(e => e.name === entityName)
+    
+    if (isAlreadyTracked) {
+      setTrackedEntities(prev => prev.filter(e => e.name !== entityName))
+      toast({
+        title: "Entity Untracked",
+        description: `${entityName} has been removed from tracked entities.`,
+      })
+    } else {
+      const newEntity: TrackedEntity = {
+        id: `entity-${Date.now()}`,
+        name: entityName,
+        type: "auto-detected",
+        addedAt: new Date().toISOString(),
+      }
+      setTrackedEntities(prev => [...prev, newEntity])
+      toast({
+        title: "Entity Tracked",
+        description: `${entityName} is now being tracked. You'll receive alerts for related events.`,
+      })
+    }
+  }, [trackedEntities, toast])
+
+  // Check if entity is tracked
+  const isEntityTracked = useCallback((entityName: string) => {
+    return trackedEntities.some(e => e.name === entityName)
+  }, [trackedEntities])
+
+  // Track all entities from an item
+  const handleTrackAllEntities = useCallback((item: IntelItem) => {
+    const newEntities: TrackedEntity[] = []
+    
+    item.entities.forEach(entityName => {
+      if (!trackedEntities.some(e => e.name === entityName)) {
+        newEntities.push({
+          id: `entity-${Date.now()}-${entityName}`,
+          name: entityName,
+          type: "auto-detected",
+          addedAt: new Date().toISOString(),
+        })
+      }
+    })
+
+    if (newEntities.length > 0) {
+      setTrackedEntities(prev => [...prev, ...newEntities])
+      toast({
+        title: "Entities Tracked",
+        description: `${newEntities.length} new ${newEntities.length === 1 ? 'entity' : 'entities'} added to tracking.`,
+      })
+    } else {
+      toast({
+        title: "Already Tracking",
+        description: "All entities from this item are already being tracked.",
+      })
+    }
+  }, [trackedEntities, toast])
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)]">
@@ -299,35 +436,29 @@ export default function MarketIntel() {
                       <Icon className="h-5 w-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-foreground mb-1 line-clamp-1">{item.title}</h3>
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <h3 className="font-medium text-foreground text-sm leading-tight">{item.title}</h3>
+                        <span className="text-xs text-muted-foreground shrink-0">{item.timestamp}</span>
+                      </div>
                       <p className="text-sm text-muted-foreground line-clamp-2 mb-2">{item.description}</p>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline" className="text-[10px]">{item.source}</Badge>
+                        <Badge variant="outline" className="text-xs">{item.source}</Badge>
                         {item.severity && (
-                          <Badge className={`text-[10px] ${severityConfig[item.severity]}`}>
+                          <Badge className={`text-xs ${severityConfig[item.severity]}`}>
                             {item.severity}
                           </Badge>
                         )}
                         {item.sentiment && (
-                          <Badge className={`text-[10px] ${sentimentConfig[item.sentiment]}`}>
+                          <Badge className={`text-xs ${sentimentConfig[item.sentiment]}`}>
                             {item.sentiment}
                           </Badge>
                         )}
                         {item.engagement && (
-                          <span className="text-[10px] text-muted-foreground">
-                            {formatNumber(item.engagement.likes)} likes
+                          <span className="text-xs text-muted-foreground">
+                            {formatNumber(item.engagement.likes)} likes • {formatNumber(item.engagement.comments)} comments
                           </span>
                         )}
-                        <span className="text-[10px] text-muted-foreground flex items-center gap-1 ml-auto">
-                          <Clock className="h-3 w-3" />
-                          {item.timestamp}
-                        </span>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -339,58 +470,93 @@ export default function MarketIntel() {
         {/* Pagination */}
         <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
           <span className="text-sm text-muted-foreground">
-            Page {currentPage} of {Math.ceil(totalItems / itemsPerPage)}
+            Showing {(currentPage - 1) * itemsPerPage + 1}-{Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems}
           </span>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(currentPage - 1)}
               disabled={currentPage === 1}
+              onClick={() => setCurrentPage(p => p - 1)}
               className="bg-transparent"
             >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
+              <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage(currentPage + 1)}
-              disabled={currentPage >= Math.ceil(totalItems / itemsPerPage)}
+              disabled={currentPage * itemsPerPage >= totalItems}
+              onClick={() => setCurrentPage(p => p + 1)}
               className="bg-transparent"
             >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Right Sidebar */}
-      <div className="w-80 border-l border-border p-4 space-y-4 overflow-y-auto hidden xl:block">
-        {/* Trending */}
+      {/* Sidebar */}
+      <div className="w-72 border-l border-border p-4 space-y-4 overflow-y-auto hidden lg:block">
+        {/* Trending Topics */}
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-primary" />
-              Trending Now
+              Trending Topics
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {mockTrending.map((topic) => (
+            {["PFAS Water Contamination", "Ozempic Side Effects", "Data Breach Litigation", "Camp Lejeune Updates"].map((topic) => (
               <button
-                key={topic.name}
+                key={topic}
                 className="w-full flex items-center justify-between p-2 rounded-md hover:bg-secondary/50 transition-colors text-left"
-                onClick={() => setSearchQuery(topic.name)}
               >
-                <span className="text-sm text-foreground">{topic.name}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{formatNumber(topic.mentions)}</span>
-                  {topic.trend === "up" && <TrendingUp className="h-3 w-3 text-green-500" />}
-                  {topic.trend === "down" && <TrendingUp className="h-3 w-3 text-red-500 rotate-180" />}
-                </div>
+                <span className="text-sm text-foreground">{topic}</span>
+                <Badge variant="secondary" className="text-xs">+23%</Badge>
               </button>
             ))}
+          </CardContent>
+        </Card>
+
+        {/* Tracked Entities */}
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Target className="h-4 w-4 text-primary" />
+              Tracked Entities
+              {trackedEntities.length > 0 && (
+                <Badge variant="secondary" className="text-xs ml-auto">
+                  {trackedEntities.length}
+                </Badge>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {trackedEntities.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">
+                No entities tracked yet. Click "Track Entity" on any item to start monitoring.
+              </p>
+            ) : (
+              trackedEntities.slice(0, 5).map((entity) => (
+                <div
+                  key={entity.id}
+                  className="flex items-center justify-between p-2 rounded-md bg-secondary/30"
+                >
+                  <span className="text-sm text-foreground">{entity.name}</span>
+                  <button 
+                    onClick={() => handleTrackEntity(entity.name)}
+                    className="text-xs text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))
+            )}
+            {trackedEntities.length > 5 && (
+              <button className="w-full text-xs text-primary hover:underline">
+                View all {trackedEntities.length} entities
+              </button>
+            )}
           </CardContent>
         </Card>
 
@@ -513,28 +679,124 @@ export default function MarketIntel() {
             <div className="space-y-2">
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Related Entities</h4>
               <div className="flex flex-wrap gap-2">
-                {selectedItem.entities.map((entity) => (
-                  <Badge key={entity} variant="secondary" className="cursor-pointer hover:bg-primary/20">
-                    {entity}
-                  </Badge>
-                ))}
+                {selectedItem.entities.map((entity) => {
+                  const isTracked = isEntityTracked(entity)
+                  return (
+                    <Badge 
+                      key={entity} 
+                      variant={isTracked ? "default" : "secondary"}
+                      className={`cursor-pointer transition-colors ${isTracked ? 'bg-primary' : 'hover:bg-primary/20'}`}
+                      onClick={() => handleTrackEntity(entity)}
+                    >
+                      {isTracked && <Check className="h-3 w-3 mr-1" />}
+                      {entity}
+                    </Badge>
+                  )
+                })}
               </div>
+              <p className="text-xs text-muted-foreground">Click an entity to track/untrack it</p>
             </div>
 
             {/* Actions */}
             <div className="flex items-center gap-2 pt-4 border-t border-border">
-              <Button size="sm" className="gap-2">
+              <Button size="sm" className="gap-2" onClick={() => handleOpenAddToBoard(selectedItem)}>
                 <Plus className="h-4 w-4" />
                 Add to Board
               </Button>
-              <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2 bg-transparent"
+                onClick={() => handleTrackAllEntities(selectedItem)}
+              >
                 <Target className="h-4 w-4" />
-                Track Entity
+                Track All Entities
               </Button>
             </div>
           </div>
         )}
       </SlideOver>
+
+      {/* Add to Board Modal */}
+      <Dialog open={addToBoardOpen} onOpenChange={setAddToBoardOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LayoutGrid className="h-5 w-5 text-primary" />
+              Add to Board
+            </DialogTitle>
+            <DialogDescription>
+              Add "{itemToAdd?.title}" to a board for tracking and collaboration.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Board Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Board</label>
+              {boards.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  No boards available. Create a board first.
+                </p>
+              ) : (
+                <div className="grid gap-2 max-h-48 overflow-y-auto">
+                  {boards.map((board) => (
+                    <button
+                      key={board.id}
+                      onClick={() => {
+                        setSelectedBoardId(board.id)
+                        setSelectedColumnId("")
+                      }}
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors text-left ${
+                        selectedBoardId === board.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <Target className="h-4 w-4 text-primary shrink-0" />
+                      <span className="font-medium text-sm">{board.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Column Selection */}
+            {selectedBoardId && selectedBoardColumns.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Column</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {selectedBoardColumns.map((column) => (
+                    <button
+                      key={column.id}
+                      onClick={() => setSelectedColumnId(column.id)}
+                      className={`p-2 rounded-md border text-sm transition-colors ${
+                        selectedColumnId === column.id
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      {column.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddToBoardOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleConfirmAddToBoard}
+              disabled={!selectedBoardId || !selectedColumnId}
+            >
+              Add to Board
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
