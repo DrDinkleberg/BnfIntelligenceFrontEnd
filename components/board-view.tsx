@@ -327,7 +327,7 @@ export default function BoardView() {
       ...col,
       items: col.items.map(item => ({
         ...item,
-        comments: (item as any).comments || [],
+        comments: Array.isArray((item as any).comments) ? (item as any).comments : [],
       }))
     }))
   )
@@ -344,7 +344,7 @@ export default function BoardView() {
         const existingItem = columns.flatMap(c => c.items).find(i => i.id === item.id)
         return {
           ...item,
-          comments: existingItem?.comments || (item as any).comments || [],
+          comments: existingItem?.comments || (Array.isArray((item as any).comments) ? (item as any).comments : []),
         }
       })
     }))
